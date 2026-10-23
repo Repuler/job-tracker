@@ -1,4 +1,4 @@
-from src.models import *
+from src.Models import *
 
 def test_orgs_get_unique_ids():
     assert Org("A", "a.com").id != Org("B", "b.com").id

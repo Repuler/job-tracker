@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 import sqlite3
 from datetime import datetime
 
-from .models import Job, Seniority, WorkMode
+from typing import Optional
+from .Models import Job, Seniority, WorkMode
 
 class JobAlreadyExists(Exception):
     pass
@@ -18,7 +19,7 @@ class JobRepository(ABC):
         ...
 
     @abstractmethod
-    def get(self, job_id: str) -> Job | None:
+    def get(self, job_id: str) -> Optional[Job]:
         ...
 
     @abstractmethod
@@ -94,7 +95,7 @@ class SqliteJobRepository(JobRepository):
             description=row["description"],
         )
 
-    def add(self, job: Job) -> None:
+    def add(self, job: Job) -> str:
         # INSERT INTO jobs VALUES (?, ?, ...) with self._to_row(job), then commit
         try:
             self._conn.execute(
@@ -104,8 +105,9 @@ class SqliteJobRepository(JobRepository):
         except sqlite3.IntegrityError as exc:
             raise JobAlreadyExists from exc
         self._conn.commit()
+        return job.id
 
-    def get(self, job_id: str) -> Job | None:
+    def get(self, job_id: str) -> Optional[Job]:
         # SELECT * FROM jobs WHERE id = ?  -> _from_row or None
         row = self._conn.execute(
             "SELECT * FROM jobs WHERE id = ?",
@@ -153,29 +155,28 @@ class SqliteJobRepository(JobRepository):
 class InMemoryJobRepository(JobRepository):
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
-    def add(self, job: Job) -> None:
+    def add(self, job: Job) -> str:
         # store under job.id; raise ValueError if the id already exists
-        if self._jobs.get(job.id):
+        if job.id in self._jobs:
             raise JobAlreadyExists
         self._jobs[job.id] = job
+        return job.id
 
-    def get(self, job_id: str) -> Job | None:
-        if not self._jobs.get(job_id):
-            raise JobNotFoundError
+    def get(self, job_id: str) -> Optional[Job]:
         return self._jobs.get(job_id)
 
-    def list(self) -> list[Job]:
-        return self._jobs.items()
+    def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
+        return list[Job](self._jobs.values())[offset:offset + limit]
 
     def update(self, job: Job) -> None:
         # raise JobNotFoundError if missing, else replace
-        if not self._jobs.get(job.id):
+        if not job.id in self._jobs:
             raise JobNotFoundError
         self._jobs[job.id] = job
         
     def delete(self, job_id: str) -> None:
         # raise JobNotFoundError if missing, else remove
-        if not self._jobs.get(job_id):
+        if not job_id in self._jobs:
             raise JobNotFoundError
         self._jobs.pop(job_id)
         
