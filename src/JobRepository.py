@@ -120,7 +120,7 @@ class SqliteJobRepository(JobRepository):
     def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
         # SELECT * FROM jobs  -> [_from_row(r) for r in rows]
         rows = self._conn.execute(
-            "SELECT * FROM jobs ORDER BY created_at, id LIMIT ? OFFSET ?",
+            "SELECT * FROM jobs ORDER BY posted_at, id LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()
         return [self._from_row(row) for row in rows]
