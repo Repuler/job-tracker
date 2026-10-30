@@ -1,25 +1,8 @@
-from copy import deepcopy
 from datetime import datetime
 import pytest
 from src.Models import Job, Seniority, WorkMode
 from src.JobRepository import (InMemoryJobRepository, SqliteJobRepository,
                                JobAlreadyExists, JobNotFoundError)
-
-# mock job
-mock_job = Job(
-    "Software Engineer",
-    "temp_url.com/job",
-    'org-1',
-    Seniority.ENTRY,
-    WorkMode.REMOTE,
-    "job-1",
-    90000,
-    120000,
-    datetime(2009, 10, 5, 18, 00),
-    "LinkedIn",
-    "Golden, CO",
-    "Coding with Python"
-)
 
 def make_job(**overrides) -> Job:
     fields = dict(
@@ -81,7 +64,7 @@ def test_list_respects_limit_and_offset(repo):
     repo.add(job2)
     repo.add(job3)
 
-    # List with limit=2, offset=0: first two jobs
+    # List with limit=2, offset=1: last two jobs
     jobs = repo.list(limit=2, offset=1)
     assert len(jobs) == 2
     # Confirm which jobs are returned
@@ -101,12 +84,12 @@ def test_update_changes_fields(repo):
     assert get_job.title != job.title
 def test_update_missing_raises(repo): 
     with pytest.raises(JobNotFoundError):
-        repo.update(mock_job)
+        repo.update(make_job())
 
 # delete
 def test_delete_removes_job(repo):
     job = make_job()
-    repo.add(mock_job)
+    repo.add(job)
     job = repo.get(job.id)
     assert job is not None
     repo.delete(job.id)

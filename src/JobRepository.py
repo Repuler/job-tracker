@@ -15,7 +15,7 @@ class JobNotFoundError(Exception):
 
 class JobRepository(ABC):
     @abstractmethod
-    def add(self, job: Job) -> None:
+    def add(self, job: Job) -> str:
         ...
 
     @abstractmethod
