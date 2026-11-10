@@ -2,10 +2,10 @@ from datetime import datetime
 import pytest
 from src.Models import Application, Job, Resume, Seniority, Status, WorkMode
 from src.JobRepository import (InMemoryJobRepository, SqliteJobRepository,
-                               JobAlreadyExists, JobNotFoundError)
+                               JobAlreadyExistsError, JobNotFoundError)
 from src.ApplicationRepository import (InMemoryApplicationRepository,
                                        SqliteApplicationRepository,
-                                       AppAlreadyExists, AppNotFoundError)
+                                       AppAlreadyExistsError, AppNotFoundError)
 
 def make_job(**overrides) -> Job:
     fields = dict(
@@ -25,12 +25,16 @@ def make_job(**overrides) -> Job:
     fields.update(overrides)
     return Job(**fields)
 
-
 @pytest.fixture(params=["memory", "sqlite"])
 def repo(request):
     if request.param == "memory":
-        return InMemoryJobRepository()
-    return SqliteJobRepository(":memory:")
+        yield InMemoryJobRepository()
+        return
+    sqlite_repo = SqliteJobRepository(":memory:")
+    try:
+        yield sqlite_repo
+    finally:
+        sqlite_repo.close()
 
 # add / get
 def test_add_then_get_returns_equal_job(repo):
@@ -50,7 +54,7 @@ def test_get_missing_returns_none(repo):
 def test_add_duplicate_raises(repo):
     job = make_job()
     assert repo.add(job) is not None
-    with pytest.raises(JobAlreadyExists):
+    with pytest.raises(JobAlreadyExistsError):
         repo.add(job)
 
 # list
@@ -117,7 +121,7 @@ def make_resume(**overrides) -> Resume:
 
 def make_app(**overrides) -> Application:
     fields = dict(
-        url="https://jobs.example/1",
+        job_id="job-1",
         resume=make_resume(),
         id="app-1",
         applied_at=datetime(2026, 2, 1, 12, 0),
@@ -132,8 +136,13 @@ def make_app(**overrides) -> Application:
 @pytest.fixture(params=["memory", "sqlite"])
 def app_repo(request):
     if request.param == "memory":
-        return InMemoryApplicationRepository()
-    return SqliteApplicationRepository(":memory:")
+        yield InMemoryApplicationRepository()
+        return
+    sqlite_repo = SqliteApplicationRepository(":memory:")
+    try:
+        yield sqlite_repo
+    finally:
+        sqlite_repo.close()
 
 
 def test_add_then_get_returns_equal_app(app_repo):
@@ -151,7 +160,7 @@ def test_get_missing_app_returns_none(app_repo):
 def test_add_duplicate_app_raises(app_repo):
     app = make_app()
     assert app_repo.add(app) is not None
-    with pytest.raises(AppAlreadyExists):
+    with pytest.raises(AppAlreadyExistsError):
         app_repo.add(app)
 
 
@@ -161,8 +170,8 @@ def test_list_apps_empty(app_repo):
 
 def test_list_apps_respects_limit_and_offset(app_repo):
     app1 = make_app(id="app-1", created_at=datetime(2026, 1, 1))
-    app2 = make_app(id="app-2", url="https://jobs.example/2", created_at=datetime(2026, 1, 2))
-    app3 = make_app(id="app-3", url="https://jobs.example/3", created_at=datetime(2026, 1, 3))
+    app2 = make_app(id="app-2", job_id="job-2", created_at=datetime(2026, 1, 2))
+    app3 = make_app(id="app-3", job_id="job-3", created_at=datetime(2026, 1, 3))
 
     app_repo.add(app1)
     app_repo.add(app2)
@@ -176,7 +185,8 @@ def test_update_app_changes_fields(app_repo):
     app = make_app()
     app_repo.add(app)
     updated = make_app(
-        url="https://jobs.example/updated",
+        id=app.id,
+        job_id="job-2",
         status=Status.INTERVIEWING,
         resume=make_resume(title="tailored"),
     )

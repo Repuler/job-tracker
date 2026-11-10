@@ -1,5 +1,4 @@
 from __future__ import annotations
-from ast import Dict, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,7 +15,7 @@ class Status(Enum):
     WITHDRAWN = "withdrawn"
 
 
-ALLOWED_TRANSITIONS: Dict[Status, Set[Status]] = {
+ALLOWED_TRANSITIONS: dict[Status, set[Status]] = {
     Status.SAVED: {Status.APPLIED},
     Status.APPLIED: {Status.INTERVIEWING, Status.REJECTED},
     Status.INTERVIEWING: {Status.OFFERED, Status.REJECTED},
@@ -65,7 +64,7 @@ class Job:
     id: str = field(default_factory=new_id)
     salary_min: int | None = None
     salary_max: int | None = None
-    posted_at: datetime | None = None
+    posted_at: datetime = field(default_factory=datetime.now)
     source: str | None = None  # "LinkedIn", "Job Scout", etc.
     location: str | None = None
     description: str | None = None
@@ -138,8 +137,8 @@ class Resume:
 
 @dataclass
 class Application:
-    url: str
     resume: Resume
+    job_id: str
     id: str = field(default_factory=new_id)
     applied_at: datetime | None = None
     updated_at: datetime = field(default_factory=datetime.now)

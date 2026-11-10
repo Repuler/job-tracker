@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 from .Models import Application, Resume, Status
 
-class AppAlreadyExists(Exception):
+class AppAlreadyExistsError(Exception):
     pass
 
 class AppNotFoundError(Exception):
@@ -44,7 +44,7 @@ class SqliteApplicationRepository(ApplicationRepository):
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS applications (
                 id TEXT PRIMARY KEY,
-                url TEXT NOT NULL,
+                job_id TEXT NOT NULL,
                 resume_title TEXT NOT NULL,
                 resume_file_path TEXT NOT NULL,
                 resume_file_link TEXT,
@@ -58,12 +58,15 @@ class SqliteApplicationRepository(ApplicationRepository):
         """)
         self._conn.commit()
 
+    def close(self) -> None:
+        self._conn.close()
+
     # --- conversion helpers: the only place that knows the row format ---
     def _to_row(self, app: Application) -> tuple:
         # enums -> .value, datetimes -> .isoformat(), None stays None
         return (
             app.id,
-            app.url,
+            app.job_id,
             app.resume.title,
             app.resume.file_path,
             app.resume.file_link,
@@ -80,7 +83,7 @@ class SqliteApplicationRepository(ApplicationRepository):
         applied_at = row["applied_at"]
         return Application(
             id=row["id"],
-            url=row["url"],
+            job_id=row["job_id"],
             resume=Resume(
                 title=row["resume_title"],
                 file_path=row["resume_file_path"],
@@ -102,7 +105,7 @@ class SqliteApplicationRepository(ApplicationRepository):
                 self._to_row(app),
             )
         except sqlite3.IntegrityError as exc:
-            raise AppAlreadyExists from exc
+            raise AppAlreadyExistsError from exc
         self._conn.commit()
         return app.id
 
@@ -130,7 +133,7 @@ class SqliteApplicationRepository(ApplicationRepository):
         cursor = self._conn.execute(
             """
             UPDATE applications
-            SET url = ?, resume_title = ?, resume_file_path = ?, resume_file_link = ?,
+            SET job_id = ?, resume_title = ?, resume_file_path = ?, resume_file_link = ?,
                 resume_created_at = ?, resume_updated_at = ?, applied_at = ?,
                 updated_at = ?, created_at = ?, status = ?
             WHERE id = ?
@@ -156,9 +159,9 @@ class InMemoryApplicationRepository(ApplicationRepository):
         self._apps: dict[str, Application] = {}
 
     def add(self, app: Application) -> str:
-        # store under app.id; raise AppAlreadyExists if the id already exists
+        # store under app.id; raise AppAlreadyExistsError if the id already exists
         if app.id in self._apps:
-            raise AppAlreadyExists
+            raise AppAlreadyExistsError
         self._apps[app.id] = app
         return app.id
 
