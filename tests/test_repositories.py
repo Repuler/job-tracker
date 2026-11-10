@@ -1,8 +1,11 @@
 from datetime import datetime
 import pytest
-from src.Models import Job, Seniority, WorkMode
+from src.Models import Application, Job, Resume, Seniority, Status, WorkMode
 from src.JobRepository import (InMemoryJobRepository, SqliteJobRepository,
                                JobAlreadyExists, JobNotFoundError)
+from src.ApplicationRepository import (InMemoryApplicationRepository,
+                                       SqliteApplicationRepository,
+                                       AppAlreadyExists, AppNotFoundError)
 
 def make_job(**overrides) -> Job:
     fields = dict(
@@ -98,3 +101,103 @@ def test_delete_removes_job(repo):
 def test_delete_missing_raises(repo):
     with pytest.raises(JobNotFoundError):
         repo.delete(make_job().id)
+
+
+def make_resume(**overrides) -> Resume:
+    fields = dict(
+        title="acme",
+        file_path="resumes/acme.pdf",
+        file_link="https://files.example/acme.pdf",
+        created_at=datetime(2026, 1, 2, 3, 4, 5),
+        updated_at=datetime(2026, 1, 2, 3, 4, 6),
+    )
+    fields.update(overrides)
+    return Resume(**fields)
+
+
+def make_app(**overrides) -> Application:
+    fields = dict(
+        url="https://jobs.example/1",
+        resume=make_resume(),
+        id="app-1",
+        applied_at=datetime(2026, 2, 1, 12, 0),
+        updated_at=datetime(2026, 2, 2, 12, 0),
+        created_at=datetime(2026, 1, 15, 9, 0),
+        status=Status.APPLIED,
+    )
+    fields.update(overrides)
+    return Application(**fields)
+
+
+@pytest.fixture(params=["memory", "sqlite"])
+def app_repo(request):
+    if request.param == "memory":
+        return InMemoryApplicationRepository()
+    return SqliteApplicationRepository(":memory:")
+
+
+def test_add_then_get_returns_equal_app(app_repo):
+    app = make_app()
+    app_id = app_repo.add(app)
+    assert app_id is not None
+    stored = app_repo.get(app_id)
+    assert stored == app
+
+
+def test_get_missing_app_returns_none(app_repo):
+    assert app_repo.get("app-missing") is None
+
+
+def test_add_duplicate_app_raises(app_repo):
+    app = make_app()
+    assert app_repo.add(app) is not None
+    with pytest.raises(AppAlreadyExists):
+        app_repo.add(app)
+
+
+def test_list_apps_empty(app_repo):
+    assert app_repo.list() == []
+
+
+def test_list_apps_respects_limit_and_offset(app_repo):
+    app1 = make_app(id="app-1", created_at=datetime(2026, 1, 1))
+    app2 = make_app(id="app-2", url="https://jobs.example/2", created_at=datetime(2026, 1, 2))
+    app3 = make_app(id="app-3", url="https://jobs.example/3", created_at=datetime(2026, 1, 3))
+
+    app_repo.add(app1)
+    app_repo.add(app2)
+    app_repo.add(app3)
+
+    apps = app_repo.list(limit=2, offset=1)
+    assert [app.id for app in apps] == [app2.id, app3.id]
+
+
+def test_update_app_changes_fields(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    updated = make_app(
+        url="https://jobs.example/updated",
+        status=Status.INTERVIEWING,
+        resume=make_resume(title="tailored"),
+    )
+    app_repo.update(updated)
+    stored = app_repo.get(app.id)
+    assert stored == updated
+
+
+def test_update_missing_app_raises(app_repo):
+    with pytest.raises(AppNotFoundError):
+        app_repo.update(make_app())
+
+
+def test_delete_removes_app(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    assert app_repo.get(app.id) is not None
+    app_repo.delete(app.id)
+    assert app_repo.get(app.id) is None
+
+
+def test_delete_missing_app_raises(app_repo):
+    with pytest.raises(AppNotFoundError):
+        app_repo.delete(make_app().id)

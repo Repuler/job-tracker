@@ -140,6 +140,7 @@ class Resume:
 class Application:
     url: str
     resume: Resume
+    id: str = field(default_factory=new_id)
     applied_at: datetime | None = None
     updated_at: datetime = field(default_factory=datetime.now)
     created_at: datetime = field(default_factory=datetime.now)
