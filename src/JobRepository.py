@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 from .Models import Job, Seniority, WorkMode
 
-class JobAlreadyExists(Exception):
+class JobAlreadyExistsError(Exception):
     pass
 
 class JobNotFoundError(Exception):
@@ -59,6 +59,9 @@ class SqliteJobRepository(JobRepository):
         """)
         self._conn.commit()
 
+    def close(self) -> None:
+        self._conn.close()
+
     # --- conversion helpers: the only place that knows the row format ---
     def _to_row(self, job: Job) -> tuple:
         # enums -> .value, datetimes -> .isoformat(), None stays None
@@ -103,7 +106,7 @@ class SqliteJobRepository(JobRepository):
                 self._to_row(job),
             )
         except sqlite3.IntegrityError as exc:
-            raise JobAlreadyExists from exc
+            raise JobAlreadyExistsError from exc
         self._conn.commit()
         return job.id
 
@@ -155,10 +158,11 @@ class SqliteJobRepository(JobRepository):
 class InMemoryJobRepository(JobRepository):
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
+
     def add(self, job: Job) -> str:
         # store under job.id; raise ValueError if the id already exists
         if job.id in self._jobs:
-            raise JobAlreadyExists
+            raise JobAlreadyExistsError
         self._jobs[job.id] = job
         return job.id
 
@@ -166,7 +170,11 @@ class InMemoryJobRepository(JobRepository):
         return self._jobs.get(job_id)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
-        return list[Job](self._jobs.values())[offset:offset + limit]
+        def _job_sort_key(job: Job) -> tuple:
+            return (job.posted_at is not None, job.posted_at, job.id)
+
+        jobs = sorted(self._jobs.values(), key=_job_sort_key)
+        return jobs[offset:offset + limit]
 
     def update(self, job: Job) -> None:
         # raise JobNotFoundError if missing, else replace
