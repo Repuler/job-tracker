@@ -62,9 +62,9 @@ class Job:
     seniority: Seniority
     workmode: WorkMode
     id: str = field(default_factory=new_id)
+    posted_at: datetime | None = None
     salary_min: int | None = None
     salary_max: int | None = None
-    posted_at: datetime = field(default_factory=datetime.now)
     source: str | None = None  # "LinkedIn", "Job Scout", etc.
     location: str | None = None
     description: str | None = None

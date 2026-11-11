@@ -158,6 +158,7 @@ class SqliteJobRepository(JobRepository):
 class InMemoryJobRepository(JobRepository):
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
+
     def add(self, job: Job) -> str:
         # store under job.id; raise ValueError if the id already exists
         if job.id in self._jobs:
@@ -169,7 +170,11 @@ class InMemoryJobRepository(JobRepository):
         return self._jobs.get(job_id)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
-        return list[Job](sorted(self._jobs.values(), key=lambda job: (job.posted_at, job.id)))[offset:offset + limit]
+        def _job_sort_key(job: Job) -> tuple:
+            return (job.posted_at is not None, job.posted_at, job.id)
+
+        jobs = sorted(self._jobs.values(), key=_job_sort_key)
+        return jobs[offset:offset + limit]
 
     def update(self, job: Job) -> None:
         # raise JobNotFoundError if missing, else replace
