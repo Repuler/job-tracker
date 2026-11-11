@@ -149,6 +149,7 @@ def test_add_then_get_returns_equal_app(app_repo):
     app = make_app()
     app_id = app_repo.add(app)
     assert app_id is not None
+    assert app_id == app.id
     stored = app_repo.get(app_id)
     assert stored == app
 

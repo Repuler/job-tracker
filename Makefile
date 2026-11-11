@@ -1,4 +1,4 @@
 .PHONY: test
 
 test:
-	.venv/bin/python -m pytest
+	.venv/bin/python -m pytest -q
