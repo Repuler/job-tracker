@@ -59,6 +59,13 @@ class SqliteJobRepository(JobRepository):
         """)
         self._conn.commit()
 
+    def check_connection(self) -> bool:
+        try:
+            self._conn.execute("SELECT 1").fetchone()
+            return True
+        except Exception as e:
+            raise ConnectionError from e
+
     def close(self) -> None:
         self._conn.close()
 
