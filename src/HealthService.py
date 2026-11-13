@@ -3,12 +3,12 @@
 # databaseHealth
 from fastapi import APIRouter
 
-from src.JobRepository import SqliteJobRepository
+from src.JobRepository import JobRepository
 
 
 class HealthService:
-    def __init__(self, job_repository: SqliteJobRepository | None = None):
-        self.job_repository = job_repository or SqliteJobRepository()
+    def __init__(self, job_repository: JobRepository):
+        self.job_repository = job_repository
         self.router = APIRouter()
         self.router.add_api_route("/health", self.serviceHealth, methods=["GET"])
 
