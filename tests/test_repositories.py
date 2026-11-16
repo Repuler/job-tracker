@@ -48,9 +48,9 @@ def test_add_then_get_returns_equal_job(repo):
     for i in range(len(job1)):
         assert job2[i] == job1[i]
 def test_get_missing_returns_none(repo):
-    job_id = 'job-2'
-    job = repo.get(job_id)
-    assert job is None
+    with pytest.raises(JobNotFoundError):
+        job_id = 'job-2'
+        job = repo.get(job_id)
 def test_add_duplicate_raises(repo):
     job = make_job()
     assert repo.add(job) is not None
@@ -91,7 +91,8 @@ def test_update_changes_fields(repo):
     assert get_job.title != job.title
 def test_update_missing_raises(repo): 
     with pytest.raises(JobNotFoundError):
-        repo.update(make_job())
+        job = make_job(id="missing")
+        repo.update(job)
 
 # delete
 def test_delete_removes_job(repo):
@@ -100,8 +101,8 @@ def test_delete_removes_job(repo):
     job = repo.get(job.id)
     assert job is not None
     repo.delete(job.id)
-    job = repo.get(job.id)
-    assert job is None
+    with pytest.raises(JobNotFoundError):
+        repo.get(job.id)
 def test_delete_missing_raises(repo):
     with pytest.raises(JobNotFoundError):
         repo.delete(make_job().id)
@@ -155,7 +156,8 @@ def test_add_then_get_returns_equal_app(app_repo):
 
 
 def test_get_missing_app_returns_none(app_repo):
-    assert app_repo.get("app-missing") is None
+    with pytest.raises(AppNotFoundError):
+        app_repo.get("app-missing")
 
 
 def test_add_duplicate_app_raises(app_repo):
@@ -206,7 +208,8 @@ def test_delete_removes_app(app_repo):
     app_repo.add(app)
     assert app_repo.get(app.id) is not None
     app_repo.delete(app.id)
-    assert app_repo.get(app.id) is None
+    with pytest.raises(AppNotFoundError):
+        app_repo.get(app.id)
 
 
 def test_delete_missing_app_raises(app_repo):

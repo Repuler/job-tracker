@@ -8,10 +8,14 @@ from typing import Optional
 from .Models import Application, Resume, Status
 
 class AppAlreadyExistsError(Exception):
-    pass
+    def __init__(self, app_id):
+        self.app_id = app_id
+        super().__init__(f"Application {app_id} already exists")
 
 class AppNotFoundError(Exception):
-    pass
+    def __init__(self, app_id):
+        self.app_id = app_id
+        super().__init__(f"Application {app_id} not found")
 
 class ApplicationRepository(ABC):
     @abstractmethod
@@ -105,7 +109,7 @@ class SqliteApplicationRepository(ApplicationRepository):
                 self._to_row(app),
             )
         except sqlite3.IntegrityError as exc:
-            raise AppAlreadyExistsError from exc
+            raise AppAlreadyExistsError(app.id) from exc
         self._conn.commit()
         return app.id
 
@@ -116,7 +120,7 @@ class SqliteApplicationRepository(ApplicationRepository):
             (app_id,),
         ).fetchone()
         if row is None:
-            return None
+            raise AppNotFoundError(app_id)
         return self._from_row(row)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Application]:
@@ -141,7 +145,7 @@ class SqliteApplicationRepository(ApplicationRepository):
             (*values[1:], values[0]),
         )
         if cursor.rowcount == 0:
-            raise AppNotFoundError
+            raise AppNotFoundError(app.id)
         self._conn.commit()
 
     def delete(self, app_id: str) -> None:
@@ -151,7 +155,7 @@ class SqliteApplicationRepository(ApplicationRepository):
             (app_id,),
         )
         if cursor.rowcount == 0:
-            raise AppNotFoundError
+            raise AppNotFoundError(app_id)
         self._conn.commit()
 
 class InMemoryApplicationRepository(ApplicationRepository):
@@ -161,12 +165,15 @@ class InMemoryApplicationRepository(ApplicationRepository):
     def add(self, app: Application) -> str:
         # store under app.id; raise AppAlreadyExistsError if the id already exists
         if app.id in self._apps:
-            raise AppAlreadyExistsError
+            raise AppAlreadyExistsError(app.id)
         self._apps[app.id] = app
         return app.id
 
     def get(self, app_id: str) -> Optional[Application]:
-        return self._apps.get(app_id)
+        try:
+            return self._apps[app_id]
+        except KeyError:
+            raise AppNotFoundError(app_id)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Application]:
         apps = sorted(self._apps.values(), key=lambda app: (app.created_at, app.id))
@@ -175,11 +182,11 @@ class InMemoryApplicationRepository(ApplicationRepository):
     def update(self, app: Application) -> None:
         # raise AppNotFoundError if missing, else replace
         if app.id not in self._apps:
-            raise AppNotFoundError
+            raise AppNotFoundError(app.id)
         self._apps[app.id] = app
 
     def delete(self, app_id: str) -> None:
         # raise AppNotFoundError if missing, else remove
         if app_id not in self._apps:
-            raise AppNotFoundError
+            raise AppNotFoundError(app_id)
         self._apps.pop(app_id)
