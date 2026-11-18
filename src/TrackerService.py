@@ -7,7 +7,7 @@
 from fastapi import APIRouter
 from fastapi.exceptions import HTTPException
 from src.JobRepository import InMemoryJobRepository, JobRepository, JobAlreadyExistsError, JobNotFoundError
-from src.Models import Job, Application, Resume, Status
+from src.Models import JobInput, ApplicationInput, Resume, Status
 from src.ApplicationRepository import InMemoryApplicationRepository, ApplicationRepository, AppAlreadyExistsError, AppNotFoundError
 
 
@@ -26,10 +26,10 @@ class TrackerService:
         self.router.add_api_route("/applications/{app_id}/apply", self.apply_to_job, methods=["POST"])
         self.router.add_api_route("/applications/{app_id}/advance", self.advance_application, methods=["POST"])
 
-    def add_job(self, job: Job):
+    def add_job(self, job: JobInput):
         try: 
             job_id = self.job_repository.add(job)
-            app_id = self.application_repository.add(Application(job_id=job_id))
+            app_id = self.application_repository.add(ApplicationInput(job_id=job_id))
             return {"job_id": job_id, "app_id": app_id}
         except Exception as e:
             if isinstance(e, JobAlreadyExistsError):

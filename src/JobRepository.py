@@ -6,8 +6,7 @@ import sqlite3
 from datetime import datetime
 
 from typing import Optional
-import uuid
-from .Models import Job, Seniority, WorkMode
+from .Models import Job, JobInput, Seniority, WorkMode
 
 class JobAlreadyExistsError(Exception):
     def __init__(self, job_id: str):
@@ -21,7 +20,7 @@ class JobNotFoundError(Exception):
 
 class JobRepository(ABC):
     @abstractmethod
-    def add(self, job: Job) -> str:
+    def add(self, job: JobInput) -> str:
         ...
 
     @abstractmethod
@@ -114,12 +113,13 @@ class SqliteJobRepository(JobRepository):
             description=row["description"],
         )
 
-    def add(self, job: Job) -> str:
+    def add(self, job: JobInput) -> str:
         # Create new job id
         # INSERT INTO jobs VALUES (?, ?, ...) with self._to_row(job), then commit
         try:
-            # job_id = str(uuid.uuid4())
-            # job.id = job_id
+            # cast job to Job
+            job = Job(**job.__dict__)
+            # insert job into database
             self._conn.execute(
                 "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 self._to_row(job),
@@ -182,10 +182,10 @@ class InMemoryJobRepository(JobRepository):
         if not isinstance(self._jobs, dict):
             raise ConnectionError("Job repository is unavailable")
 
-    def add(self, job: Job) -> str:
+    def add(self, job: JobInput) -> str:
         # store under job.id; raise ValueError if the id already exists
-        # job_id = str(uuid.uuid4())
-        # job.id = job_id
+        # cast job to Job
+        job = Job(**job.__dict__)
         if job.id in self._jobs:
             raise JobAlreadyExistsError(job.id)
         self._jobs[job.id] = job

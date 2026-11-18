@@ -47,7 +47,7 @@ def test_post_job_then_get_list_and_job(client):
     created = client.post("/jobs", json=payload)
     assert created.status_code == 200
     created_body = created.json()
-    assert created_body["job_id"] == "job-1"
+    assert created_body["job_id"]
     assert isinstance(created_body["app_id"], str)
     assert created_body["app_id"]
 
@@ -56,31 +56,17 @@ def test_post_job_then_get_list_and_job(client):
     jobs = listed.json()
     assert len(jobs) == 1
     job = jobs[0]
-    assert job["id"] == "job-1"
+    assert job["id"] == created_body["job_id"]
     assert job["title"] == "Software Engineer"
     assert job["url"] == "https://example.com/jobs/1"
     assert job["org_id"] == "org-1"
     assert job["seniority"] == "entry"
     assert job["workmode"] == "remote"
 
-    fetched = client.get("/jobs/job-1")
+    fetched = client.get(f"/jobs/{created_body['job_id']}")
     assert fetched.status_code == 200
     assert fetched.json() == job
 
-
-def test_post_duplicate_job_returns_409(client):
-    payload = {
-        "id": "job-1",
-        "title": "Software Engineer",
-        "url": "https://example.com/jobs/1",
-        "org_id": "org-1",
-        "seniority": "entry",
-        "workmode": "remote",
-    }
-    client.post("/jobs", json=payload)
-    response = client.post("/jobs", json=payload)
-    assert response.status_code == 409
-    assert response.json() == {"detail": f"Job {payload['id']} already exists"}
 
 def test_get_missing_job_returns_null(client):
     missing_job_id = "missing"
@@ -125,7 +111,9 @@ def test_create_app_shares_the_repository_and_does_not_create_a_database_file(tm
         },
     )
     assert created.status_code == 200
-    assert repo.get("job-1").title == "Software Engineer"
+    created_body = created.json()
+    assert created_body["job_id"]
+    assert repo.get(created_body["job_id"]).title == "Software Engineer"
 
     health = next(owner for owner in owners if hasattr(owner, "databaseHealth"))
     assert health.databaseHealth() == {

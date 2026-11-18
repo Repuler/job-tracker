@@ -98,6 +98,20 @@ class Job:
     def get_org_data(self) -> Org:
         return self.org
 
+@dataclass
+class JobInput:
+    title: str
+    url: str
+    org_id: str
+    seniority: Seniority
+    workmode: WorkMode
+    posted_at: datetime | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    source: str | None = None  # "LinkedIn", "Job Scout", etc.
+    location: str | None = None
+    description: str | None = None
+
 
 @dataclass
 class Resume:
@@ -149,3 +163,8 @@ class Application:
             self.applied_at = datetime.now()
         self.status = new_status
         self.updated_at = datetime.now()
+
+@dataclass
+class ApplicationInput:
+    job_id: str
+    resume_path: str | None = None

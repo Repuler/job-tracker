@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 
 from typing import Optional
-from .Models import Application, Resume, Status
+from .Models import Application, ApplicationInput, Resume, Status
 
 class AppAlreadyExistsError(Exception):
     def __init__(self, app_id):
@@ -19,7 +19,7 @@ class AppNotFoundError(Exception):
 
 class ApplicationRepository(ABC):
     @abstractmethod
-    def add(self, app: Application) -> str:
+    def add(self, app: ApplicationInput) -> str:
         ...
 
     @abstractmethod
@@ -94,6 +94,9 @@ class SqliteApplicationRepository(ApplicationRepository):
     def add(self, app: Application) -> str:
         # INSERT INTO applications VALUES (?, ?, ...) with self._to_row(app), then commit
         try:
+            # cast app to Application
+            app = Application(**app.__dict__)
+            # insert app into database
             self._conn.execute(
                 "INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?)",
                 self._to_row(app),
@@ -158,6 +161,8 @@ class InMemoryApplicationRepository(ApplicationRepository):
 
     def add(self, app: Application) -> str:
         # store under app.id; raise AppAlreadyExistsError if the id already exists
+        # cast app to Application
+        app = Application(**app.__dict__)
         if app.id in self._apps:
             raise AppAlreadyExistsError(app.id)
         self._apps[app.id] = app
