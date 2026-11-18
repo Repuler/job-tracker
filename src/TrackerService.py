@@ -27,7 +27,7 @@ class TrackerService:
         self.router.add_api_route("/applications/{app_id}/advance", self.advance_application, methods=["POST"])
 
     def add_job(self, job: JobInput):
-        try: 
+        try:
             job_id = self.job_repository.add(job)
             app_id = self.application_repository.add(ApplicationInput(job_id=job_id))
             return {"job_id": job_id, "app_id": app_id}

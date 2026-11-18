@@ -35,6 +35,17 @@ def _repository_owners(app):
     return owners
 
 
+def test_post_empty_job_returns_422(client):
+    response = client.post("/jobs", json={})
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": (
+            "title: Field required; url: Field required; org_id: Field required; "
+            "seniority: Field required; workmode: Field required"
+        )
+    }
+
+
 def test_post_job_then_get_list_and_job(client):
     payload = {
         "title": "Software Engineer",
