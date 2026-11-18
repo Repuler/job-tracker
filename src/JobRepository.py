@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime
 
 from typing import Optional
+import uuid
 from .Models import Job, Seniority, WorkMode
 
 class JobAlreadyExistsError(Exception):
@@ -40,7 +41,7 @@ class JobRepository(ABC):
         ...
 
     @abstractmethod
-    def check_connection(self) -> bool:
+    def check_connection(self) -> None:
         ...
 
 class SqliteJobRepository(JobRepository):
@@ -68,12 +69,11 @@ class SqliteJobRepository(JobRepository):
         """)
         self._conn.commit()
 
-    def check_connection(self) -> bool:
+    def check_connection(self) -> None:
         try:
             self._conn.execute("SELECT 1").fetchone()
-            return True
         except Exception as e:
-            raise ConnectionError from e
+            raise ConnectionError("Job repository is unavailable") from e
 
     def close(self) -> None:
         self._conn.close()
@@ -115,8 +115,11 @@ class SqliteJobRepository(JobRepository):
         )
 
     def add(self, job: Job) -> str:
+        # Create new job id
         # INSERT INTO jobs VALUES (?, ?, ...) with self._to_row(job), then commit
         try:
+            # job_id = str(uuid.uuid4())
+            # job.id = job_id
             self._conn.execute(
                 "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 self._to_row(job),
@@ -175,13 +178,14 @@ class InMemoryJobRepository(JobRepository):
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
 
-    def check_connection(self) -> bool:
+    def check_connection(self) -> None:
         if not isinstance(self._jobs, dict):
-            raise ConnectionError("job store is unavailable")
-        return True
+            raise ConnectionError("Job repository is unavailable")
 
     def add(self, job: Job) -> str:
         # store under job.id; raise ValueError if the id already exists
+        # job_id = str(uuid.uuid4())
+        # job.id = job_id
         if job.id in self._jobs:
             raise JobAlreadyExistsError(job.id)
         self._jobs[job.id] = job

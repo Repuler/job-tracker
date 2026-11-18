@@ -1,6 +1,6 @@
 from datetime import datetime
 import pytest
-from src.Models import Application, Job, Resume, Seniority, Status, WorkMode
+from src.Models import Application, Job, Resume, Seniority, Status, WorkMode, InvalidTransitionError
 from src.JobRepository import (InMemoryJobRepository, SqliteJobRepository,
                                JobAlreadyExistsError, JobNotFoundError)
 from src.ApplicationRepository import (InMemoryApplicationRepository,
@@ -108,11 +108,11 @@ def test_delete_missing_raises(repo):
         repo.delete(make_job().id)
 
 
+# TODO: resume is currently deprecated while I figure out a way to handle it on the DB and API level
 def make_resume(**overrides) -> Resume:
     fields = dict(
         title="acme",
-        file_path="resumes/acme.pdf",
-        file_link="https://files.example/acme.pdf",
+        file_path="https://files.example/acme.pdf",
         created_at=datetime(2026, 1, 2, 3, 4, 5),
         updated_at=datetime(2026, 1, 2, 3, 4, 6),
     )
@@ -123,7 +123,7 @@ def make_resume(**overrides) -> Resume:
 def make_app(**overrides) -> Application:
     fields = dict(
         job_id="job-1",
-        resume=make_resume(),
+        resume_path=make_resume().file_path,
         id="app-1",
         applied_at=datetime(2026, 2, 1, 12, 0),
         updated_at=datetime(2026, 2, 2, 12, 0),
@@ -191,7 +191,7 @@ def test_update_app_changes_fields(app_repo):
         id=app.id,
         job_id="job-2",
         status=Status.INTERVIEWING,
-        resume=make_resume(title="tailored"),
+        resume_path=make_resume(title="tailored").file_path,
     )
     app_repo.update(updated)
     stored = app_repo.get(app.id)
@@ -215,3 +215,20 @@ def test_delete_removes_app(app_repo):
 def test_delete_missing_app_raises(app_repo):
     with pytest.raises(AppNotFoundError):
         app_repo.delete(make_app().id)
+
+def test_advance_app_changes_status(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    app_repo.advance_to(app.id, Status.INTERVIEWING)
+    stored = app_repo.get(app.id)
+    assert stored.status == Status.INTERVIEWING
+
+def test_advance_app_missing_raises(app_repo):
+    with pytest.raises(AppNotFoundError):
+        app_repo.advance_to("app-missing", Status.INTERVIEWING)
+
+def test_advance_app_invalid_transition_raises(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    with pytest.raises(InvalidTransitionError):
+        app_repo.advance_to(app.id, Status.OFFERED)

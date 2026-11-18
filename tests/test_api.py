@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from src.JobRepository import InMemoryJobRepository
 from src.app import create_app
+from src.Models import Status
 
 
 @pytest.fixture
@@ -45,7 +46,10 @@ def test_post_job_then_get_list_and_job(client):
     }
     created = client.post("/jobs", json=payload)
     assert created.status_code == 200
-    assert created.json() == "job-1"
+    created_body = created.json()
+    assert created_body["job_id"] == "job-1"
+    assert isinstance(created_body["app_id"], str)
+    assert created_body["app_id"]
 
     listed = client.get("/jobs")
     assert listed.status_code == 200
@@ -129,3 +133,29 @@ def test_create_app_shares_the_repository_and_does_not_create_a_database_file(tm
         "message": "Database is healthy",
     }
     assert not (tmp_path / "jobs.db").exists()
+
+
+def test_post_job_creates_saved_application(client):
+    payload = {
+        "title": "Software Engineer",
+        "url": "https://example.com/jobs/1",
+        "org_id": "org-1",
+        "seniority": "entry",
+        "workmode": "remote",
+    }
+    created = client.post("/jobs", json=payload)
+    assert created.status_code == 200
+
+    created_body = created.json()
+    job_id = created_body["job_id"]
+    app_id = created_body["app_id"]
+    assert isinstance(job_id, str) and job_id
+    assert isinstance(app_id, str) and app_id
+
+    application = client.get(f"/applications/{app_id}")
+    assert application.status_code == 200
+    body = application.json()
+    assert body["id"] == app_id
+    assert body["job_id"] == job_id
+    assert body["resume_path"] is None
+    assert body["status"] == Status.SAVED.value
