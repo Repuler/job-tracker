@@ -14,8 +14,6 @@ def _field(loc: tuple) -> str:
 
 
 def create_app(
-    tracker: TrackerService | None = None,
-    health: HealthService | None = None,
     job_repository: JobRepository | None = None,
     application_repository: ApplicationRepository | None = None,
 ) -> FastAPI:
@@ -25,15 +23,12 @@ def create_app(
     unless the caller supplies the services or the repository.
     """
     router = APIRouter()
-    if tracker is None or health is None:
-        if job_repository is None:
-            job_repository = InMemoryJobRepository()
-        if application_repository is None:
-            application_repository = InMemoryApplicationRepository()
-        if tracker is None:
-            tracker = TrackerService(router=router, job_repository=job_repository, application_repository=application_repository)
-        if health is None:
-            health = HealthService(router=router, job_repository=job_repository, application_repository=application_repository)
+    if job_repository is None:
+        job_repository = InMemoryJobRepository()
+    if application_repository is None:
+        application_repository = InMemoryApplicationRepository()
+    tracker = TrackerService(router=router, job_repository=job_repository, application_repository=application_repository)
+    health = HealthService(router=router, job_repository=job_repository, application_repository=application_repository)
     app = FastAPI()
 
     @app.exception_handler(RequestValidationError)

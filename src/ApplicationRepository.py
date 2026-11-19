@@ -23,7 +23,7 @@ class ApplicationRepository(ABC):
         ...
 
     @abstractmethod
-    def get(self, app_id: str) -> Optional[Application]:
+    def get(self, app_id: str) -> Application:
         ...
 
     @abstractmethod
@@ -106,7 +106,7 @@ class SqliteApplicationRepository(ApplicationRepository):
         self._conn.commit()
         return app.id
 
-    def get(self, app_id: str) -> Optional[Application]:
+    def get(self, app_id: str) -> Application:
         # SELECT * FROM applications WHERE id = ?  -> _from_row or None
         row = self._conn.execute(
             "SELECT * FROM applications WHERE id = ?",
@@ -168,7 +168,7 @@ class InMemoryApplicationRepository(ApplicationRepository):
         self._apps[app.id] = app
         return app.id
 
-    def get(self, app_id: str) -> Optional[Application]:
+    def get(self, app_id: str) -> Application:
         try:
             return self._apps[app_id]
         except KeyError:

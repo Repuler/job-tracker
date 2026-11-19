@@ -24,7 +24,7 @@ class JobRepository(ABC):
         ...
 
     @abstractmethod
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job:
         ...
 
     @abstractmethod
@@ -129,7 +129,7 @@ class SqliteJobRepository(JobRepository):
         self._conn.commit()
         return job.id
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job:
         # SELECT * FROM jobs WHERE id = ?  -> _from_row or None
         row = self._conn.execute(
             "SELECT * FROM jobs WHERE id = ?",
@@ -191,7 +191,7 @@ class InMemoryJobRepository(JobRepository):
         self._jobs[job.id] = job
         return job.id
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job:
         try:
             return self._jobs[job_id]
         except KeyError:

@@ -47,10 +47,10 @@ def test_add_then_get_returns_equal_job(repo):
     job2 = get_job.get_details()
     for i in range(len(job1)):
         assert job2[i] == job1[i]
-def test_get_missing_returns_none(repo):
+def test_get_missing_raises(repo):
     with pytest.raises(JobNotFoundError):
-        job_id = 'job-2'
-        job = repo.get(job_id)
+        job_id = 'missing'
+        repo.get(job_id)
 def test_add_duplicate_raises(repo):
     job = make_job()
     assert repo.add(job) is not None
@@ -105,7 +105,7 @@ def test_delete_removes_job(repo):
         repo.get(job.id)
 def test_delete_missing_raises(repo):
     with pytest.raises(JobNotFoundError):
-        repo.delete(make_job().id)
+        repo.delete('missing')
 
 
 # TODO: resume is currently deprecated while I figure out a way to handle it on the DB and API level
@@ -155,7 +155,7 @@ def test_add_then_get_returns_equal_app(app_repo):
     assert stored == app
 
 
-def test_get_missing_app_returns_none(app_repo):
+def test_get_missing_app_raises(app_repo):
     with pytest.raises(AppNotFoundError):
         app_repo.get("app-missing")
 
