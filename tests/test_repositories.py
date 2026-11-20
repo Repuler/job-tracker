@@ -1,6 +1,6 @@
 from datetime import datetime
 import pytest
-from src.Models import Application, Job, Resume, Seniority, Status, WorkMode
+from src.Models import Application, Job, Resume, Seniority, Status, WorkMode, InvalidTransitionError
 from src.JobRepository import (InMemoryJobRepository, SqliteJobRepository,
                                JobAlreadyExistsError, JobNotFoundError)
 from src.ApplicationRepository import (InMemoryApplicationRepository,
@@ -47,10 +47,10 @@ def test_add_then_get_returns_equal_job(repo):
     job2 = get_job.get_details()
     for i in range(len(job1)):
         assert job2[i] == job1[i]
-def test_get_missing_returns_none(repo):
-    job_id = 'job-2'
-    job = repo.get(job_id)
-    assert job is None
+def test_get_missing_raises(repo):
+    with pytest.raises(JobNotFoundError):
+        job_id = 'missing'
+        repo.get(job_id)
 def test_add_duplicate_raises(repo):
     job = make_job()
     assert repo.add(job) is not None
@@ -91,7 +91,8 @@ def test_update_changes_fields(repo):
     assert get_job.title != job.title
 def test_update_missing_raises(repo): 
     with pytest.raises(JobNotFoundError):
-        repo.update(make_job())
+        job = make_job(id="missing")
+        repo.update(job)
 
 # delete
 def test_delete_removes_job(repo):
@@ -100,18 +101,18 @@ def test_delete_removes_job(repo):
     job = repo.get(job.id)
     assert job is not None
     repo.delete(job.id)
-    job = repo.get(job.id)
-    assert job is None
+    with pytest.raises(JobNotFoundError):
+        repo.get(job.id)
 def test_delete_missing_raises(repo):
     with pytest.raises(JobNotFoundError):
-        repo.delete(make_job().id)
+        repo.delete('missing')
 
 
+# TODO: resume is currently deprecated while I figure out a way to handle it on the DB and API level
 def make_resume(**overrides) -> Resume:
     fields = dict(
         title="acme",
-        file_path="resumes/acme.pdf",
-        file_link="https://files.example/acme.pdf",
+        file_path="https://files.example/acme.pdf",
         created_at=datetime(2026, 1, 2, 3, 4, 5),
         updated_at=datetime(2026, 1, 2, 3, 4, 6),
     )
@@ -122,7 +123,7 @@ def make_resume(**overrides) -> Resume:
 def make_app(**overrides) -> Application:
     fields = dict(
         job_id="job-1",
-        resume=make_resume(),
+        resume_path=make_resume().file_path,
         id="app-1",
         applied_at=datetime(2026, 2, 1, 12, 0),
         updated_at=datetime(2026, 2, 2, 12, 0),
@@ -154,8 +155,9 @@ def test_add_then_get_returns_equal_app(app_repo):
     assert stored == app
 
 
-def test_get_missing_app_returns_none(app_repo):
-    assert app_repo.get("app-missing") is None
+def test_get_missing_app_raises(app_repo):
+    with pytest.raises(AppNotFoundError):
+        app_repo.get("app-missing")
 
 
 def test_add_duplicate_app_raises(app_repo):
@@ -189,7 +191,7 @@ def test_update_app_changes_fields(app_repo):
         id=app.id,
         job_id="job-2",
         status=Status.INTERVIEWING,
-        resume=make_resume(title="tailored"),
+        resume_path=make_resume(title="tailored").file_path,
     )
     app_repo.update(updated)
     stored = app_repo.get(app.id)
@@ -206,9 +208,27 @@ def test_delete_removes_app(app_repo):
     app_repo.add(app)
     assert app_repo.get(app.id) is not None
     app_repo.delete(app.id)
-    assert app_repo.get(app.id) is None
+    with pytest.raises(AppNotFoundError):
+        app_repo.get(app.id)
 
 
 def test_delete_missing_app_raises(app_repo):
     with pytest.raises(AppNotFoundError):
         app_repo.delete(make_app().id)
+
+def test_advance_app_changes_status(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    app_repo.advance_to(app.id, Status.INTERVIEWING)
+    stored = app_repo.get(app.id)
+    assert stored.status == Status.INTERVIEWING
+
+def test_advance_app_missing_raises(app_repo):
+    with pytest.raises(AppNotFoundError):
+        app_repo.advance_to("app-missing", Status.INTERVIEWING)
+
+def test_advance_app_invalid_transition_raises(app_repo):
+    app = make_app()
+    app_repo.add(app)
+    with pytest.raises(InvalidTransitionError):
+        app_repo.advance_to(app.id, Status.OFFERED)

@@ -98,12 +98,25 @@ class Job:
     def get_org_data(self) -> Org:
         return self.org
 
+@dataclass
+class JobInput:
+    title: str
+    url: str
+    org_id: str
+    seniority: Seniority
+    workmode: WorkMode
+    posted_at: datetime | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    source: str | None = None  # "LinkedIn", "Job Scout", etc.
+    location: str | None = None
+    description: str | None = None
+
 
 @dataclass
 class Resume:
     title: str
     file_path: str
-    file_link: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(
         default_factory=datetime.now
@@ -117,7 +130,6 @@ class Resume:
         self,
         title: str | None,
         file_path: str | None,
-        file_link: str | None,
     ) -> None:
         is_updated = False
         if title is not None and title != self.title:
@@ -125,9 +137,6 @@ class Resume:
             is_updated = True
         if file_path is not None and file_path != self.file_path:
             self.file_path = file_path
-            is_updated = True
-        if file_link is not None and file_link != self.file_link:
-            self.file_link = file_link
             is_updated = True
         if is_updated:
             self.updated_at = datetime.now()
@@ -137,9 +146,9 @@ class Resume:
 
 @dataclass
 class Application:
-    resume: Resume
     job_id: str
     id: str = field(default_factory=new_id)
+    resume_path: str | None = None
     applied_at: datetime | None = None
     updated_at: datetime = field(default_factory=datetime.now)
     created_at: datetime = field(default_factory=datetime.now)
@@ -154,3 +163,8 @@ class Application:
             self.applied_at = datetime.now()
         self.status = new_status
         self.updated_at = datetime.now()
+
+@dataclass
+class ApplicationInput:
+    job_id: str
+    resume_path: str | None = None

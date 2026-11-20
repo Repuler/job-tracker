@@ -1,25 +1,30 @@
 # abstract class for managing job related requests
 
 from abc import ABC, abstractmethod
+from multiprocessing import Value
 import sqlite3
 from datetime import datetime
 
 from typing import Optional
-from .Models import Job, Seniority, WorkMode
+from .Models import Job, JobInput, Seniority, WorkMode
 
 class JobAlreadyExistsError(Exception):
-    pass
+    def __init__(self, job_id: str):
+        self.job_id = job_id
+        super().__init__(f"Job {job_id} already exists")
 
 class JobNotFoundError(Exception):
-    pass
+    def __init__(self, job_id: str):
+        self.job_id = job_id
+        super().__init__(f"Job {job_id} not found")
 
 class JobRepository(ABC):
     @abstractmethod
-    def add(self, job: Job) -> str:
+    def add(self, job: JobInput) -> str:
         ...
 
     @abstractmethod
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job:
         ...
 
     @abstractmethod
@@ -32,6 +37,10 @@ class JobRepository(ABC):
 
     @abstractmethod
     def delete(self, job_id: str) -> None:
+        ...
+
+    @abstractmethod
+    def check_connection(self) -> None:
         ...
 
 class SqliteJobRepository(JobRepository):
@@ -58,6 +67,12 @@ class SqliteJobRepository(JobRepository):
             )
         """)
         self._conn.commit()
+
+    def check_connection(self) -> None:
+        try:
+            self._conn.execute("SELECT 1").fetchone()
+        except Exception as e:
+            raise ConnectionError("Job repository is unavailable") from e
 
     def close(self) -> None:
         self._conn.close()
@@ -98,26 +113,30 @@ class SqliteJobRepository(JobRepository):
             description=row["description"],
         )
 
-    def add(self, job: Job) -> str:
+    def add(self, job: JobInput) -> str:
+        # Create new job id
         # INSERT INTO jobs VALUES (?, ?, ...) with self._to_row(job), then commit
         try:
+            # cast job to Job
+            job = Job(**job.__dict__)
+            # insert job into database
             self._conn.execute(
                 "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 self._to_row(job),
             )
         except sqlite3.IntegrityError as exc:
-            raise JobAlreadyExistsError from exc
+            raise JobAlreadyExistsError(job.id) from exc
         self._conn.commit()
         return job.id
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job:
         # SELECT * FROM jobs WHERE id = ?  -> _from_row or None
         row = self._conn.execute(
             "SELECT * FROM jobs WHERE id = ?",
             (job_id,),
         ).fetchone()
         if row is None:
-            return None
+            raise JobNotFoundError(job_id)
         return self._from_row(row)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
@@ -142,7 +161,7 @@ class SqliteJobRepository(JobRepository):
             (*values[1:], values[0]),
         )
         if cursor.rowcount == 0:
-            raise JobNotFoundError
+            raise JobNotFoundError(job.id)
         self._conn.commit()
 
     def delete(self, job_id: str) -> None:
@@ -152,22 +171,31 @@ class SqliteJobRepository(JobRepository):
             (job_id,),
         )
         if cursor.rowcount == 0:
-            raise JobNotFoundError
+            raise JobNotFoundError(job_id)
         self._conn.commit()
 
 class InMemoryJobRepository(JobRepository):
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
 
-    def add(self, job: Job) -> str:
+    def check_connection(self) -> None:
+        if not isinstance(self._jobs, dict):
+            raise ConnectionError("Job repository is unavailable")
+
+    def add(self, job: JobInput) -> str:
         # store under job.id; raise ValueError if the id already exists
+        # cast job to Job
+        job = Job(**job.__dict__)
         if job.id in self._jobs:
-            raise JobAlreadyExistsError
+            raise JobAlreadyExistsError(job.id)
         self._jobs[job.id] = job
         return job.id
 
-    def get(self, job_id: str) -> Optional[Job]:
-        return self._jobs.get(job_id)
+    def get(self, job_id: str) -> Job:
+        try:
+            return self._jobs[job_id]
+        except KeyError:
+            raise JobNotFoundError(job_id)
 
     def list(self, limit: int = 100, offset: int = 0) -> list[Job]:
         def _job_sort_key(job: Job) -> tuple:
@@ -178,13 +206,14 @@ class InMemoryJobRepository(JobRepository):
 
     def update(self, job: Job) -> None:
         # raise JobNotFoundError if missing, else replace
-        if not job.id in self._jobs:
-            raise JobNotFoundError
+        if (job.id not in self._jobs):
+            raise JobNotFoundError(job.id)
         self._jobs[job.id] = job
         
     def delete(self, job_id: str) -> None:
         # raise JobNotFoundError if missing, else remove
-        if not job_id in self._jobs:
-            raise JobNotFoundError
-        self._jobs.pop(job_id)
+        try:
+            self._jobs.pop(job_id)
+        except KeyError:
+            raise JobNotFoundError(job_id)
         
